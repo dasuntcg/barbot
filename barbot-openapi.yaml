@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: BarBot Inventory API
+  version: "1.0.0"
+
+servers:
+  - url: https://YOUR-DOMAIN/api
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    InventoryItem:
+      type: object
+      properties:
+        ingredient_id: { type: string }
+        name: { type: string }
+        type: { type: string }
+        abv:  { type: number }
+        quantity_ml: { type: number }
+      required: [ingredient_id, name, quantity_ml]
+
+    CheckInput:
+      type: object
+      properties:
+        recipe_name: { type: string }
+        serves: { type: integer, default: 1, minimum: 1 }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              amount_ml: { type: number }
+            required: [name, amount_ml]
+      required: [items]
+
+paths:
+  /inventory:
+    get:
+      operationId: get_inventory
+      summary: Get current bar inventory in ml.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InventoryItem" }
+
+  /inventory/add:
+    post:
+      operationId: add_item
+      summary: Add or top up an ingredient (ml).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                quantity_ml: { type: number }
+                type: { type: string }
+                abv:  { type: number }
+              required: [name, quantity_ml]
+      responses:
+        "200": { description: OK }
+
+  /inventory/set:
+    post:
+      operationId: set_item
+      summary: Set absolute quantity (ml) for an ingredient.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                quantity_ml: { type: number, minimum: 0 }
+              required: [name, quantity_ml]
+      responses:
+        "200": { description: OK }
+
+  /check-adhoc:
+    post:
+      operationId: check_recipe
+      summary: Check if an ad-hoc recipe can be made with current stock.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CheckInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  recipe_name: { type: string }
+                  serves: { type: integer }
+                  shortages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        need_ml: { type: number }
+                        have_ml: { type: number }
+                        short_ml: { type: number }
+
+  /make-adhoc:
+    post:
+      operationId: make_recipe
+      summary: Deduct inventory for an ad-hoc recipe (atomically).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CheckInput" }
+      responses:
+        "200": { description: OK }
+        "400": { description: Insufficient stock or unknown ingredient }
